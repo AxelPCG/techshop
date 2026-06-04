@@ -8,3 +8,7 @@ class Product(BaseModel):
 class CartItem(BaseModel):
     product: Product
     quantity: int
+
+class UserData(BaseModel):
+    id: int
+    is_vip: bool = False

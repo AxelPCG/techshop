@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechShop - Frontend Simples</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: auto; }
+        h1, h2 { color: #333; }
+        #cart-details, #checkout-status { background-color: #f4f4f4; border: 1px solid #ddd; padding: 15px; margin-top: 20px; }
+        button { padding: 10px 15px; font-size: 16px; cursor: pointer; margin-right: 10px; }
+        pre { background-color: #eee; padding: 10px; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+
+    <h1>TechShop - Simulação de Frontend</h1>
+
+    <h2>Produtos</h2>
+    <button onclick="addToCart(1, 'Mouse Gamer', 150.00)">Adicionar Mouse Gamer (R$ 150,00)</button>
+    <button onclick="addToCart(2, 'Teclado Mecânico', 350.00)">Adicionar Teclado Mecânico (R$ 350,00)</button>
+
+    <h2>Carrinho</h2>
+    <button onclick="fetchCart()">Atualizar Carrinho</button>
+    <div id="cart-details">
+        <p>Clique em "Atualizar Carrinho" para ver os detalhes.</p>
+    </div>
+
+    <h2>Checkout</h2>
+    <button onclick="performCheckout()">Finalizar Compra</button>
+    <div id="checkout-status">
+        <p>Aguardando finalização da compra...</p>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:8000';
+
+        // Função para adicionar item ao carrinho
+        async function addToCart(productId, productName, productPrice) {
+            const item = {
+                product: {
+                    id: productId,
+                    name: productName,
+                    price: productPrice
+                },
+                quantity: 1
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/cart/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+                if (!response.ok) throw new Error('Falha ao adicionar item.');
+                alert(`'${productName}' adicionado ao carrinho!`);
+                fetchCart(); // Atualiza a visualização do carrinho
+            } catch (error) {
+                console.error('Erro ao adicionar item:', error);
+                alert(error.message);
+            }
+        }
+
+        // Função para buscar e exibir os detalhes do carrinho
+        async function fetchCart() {
+            const cartDetailsDiv = document.getElementById('cart-details');
+            try {
+                const response = await fetch(`${API_BASE_URL}/cart`);
+                if (!response.ok) throw new Error('Falha ao buscar o carrinho.');
+                const data = await response.json();
+                cartDetailsDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                console.error('Erro ao buscar carrinho:', error);
+                cartDetailsDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            }
+        }
+
+        // Função para finalizar a compra
+        async function performCheckout() {
+            const checkoutStatusDiv = document.getElementById('checkout-status');
+            const userData = {
+                id: 1, // ID do usuário mockado
+                is_vip: true // Simula um usuário VIP para testar o desconto
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/checkout`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Falha no checkout.');
+                
+                checkoutStatusDiv.innerHTML = `<h3>Compra Finalizada!</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                fetchCart(); // Atualiza o carrinho (deve estar vazio)
+            } catch (error) {
+                console.error('Erro no checkout:', error);
+                checkoutStatusDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            }
+        }
+
+        // Carrega o carrinho ao iniciar a página
+        document.addEventListener('DOMContentLoaded', fetchCart);
+    </script>
+
+</body>
+</html>
