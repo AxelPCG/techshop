@@ -1,25 +1,71 @@
-from typing import List
+from decimal import Decimal
+
 from src.models import CartItem, Product
 
-class ShoppingCart:
-    """
-    Representa um carrinho de compras.
-    """
-    def __init__(self):
-        """
-        Inicializa um carrinho de compras com uma lista vazia de itens.
-        """
-        self.items: List[CartItem] = []
+DISCOUNT_THRESHOLD_HIGH = Decimal("1000")
+DISCOUNT_THRESHOLD_MID = Decimal("500")
+DISCOUNT_RATE_HIGH = Decimal("0.80")
+DISCOUNT_RATE_MID = Decimal("0.90")
 
-    def add_item(self, product: Product, quantity: int):
-        """
-        Adiciona um produto ao carrinho. Se o produto já existir,
-        a quantidade é somada à existente.
+
+class DiscountCalculator:
+    """Calcula descontos progressivos sobre um total de compra.
+
+    Regras vigentes:
+        - Acima de R$ 1000: 20% de desconto.
+        - Acima de R$ 500: 10% de desconto.
+        - Abaixo ou igual a R$ 500: sem desconto.
+    """
+
+    def apply(self, total: Decimal) -> Decimal:
+        """Aplica o desconto cabível sobre o total informado.
 
         Args:
-            product (Product): O produto a ser adicionado.
-            quantity (int): A quantidade a ser adicionada.
+            total: Valor bruto do carrinho.
+
+        Returns:
+            Valor final após aplicação do desconto.
         """
+        if total > DISCOUNT_THRESHOLD_HIGH:
+            return total * DISCOUNT_RATE_HIGH
+        if total > DISCOUNT_THRESHOLD_MID:
+            return total * DISCOUNT_RATE_MID
+        return total
+
+
+class ShoppingCart:
+    """Representa o carrinho de compras de um usuário.
+
+    Attributes:
+        items: Lista de itens adicionados ao carrinho.
+    """
+
+    def __init__(self, discount_calculator: DiscountCalculator | None = None) -> None:
+        """Inicializa o carrinho com lista de itens vazia.
+
+        Args:
+            discount_calculator: Estratégia de desconto a ser usada.
+                Se não informada, usa DiscountCalculator padrão.
+        """
+        self.items: list[CartItem] = []
+        self._discount_calculator = discount_calculator or DiscountCalculator()
+
+    def add_item(self, product: Product, quantity: int) -> None:
+        """Adiciona um produto ao carrinho.
+
+        Se o produto já existir, incrementa a quantidade. A quantidade
+        informada deve ser maior que zero.
+
+        Args:
+            product: Produto a ser adicionado.
+            quantity: Quantidade a adicionar. Deve ser > 0.
+
+        Raises:
+            ValueError: Se quantity for zero ou negativo.
+        """
+        if quantity <= 0:
+            raise ValueError("quantity must be greater than zero")
+
         for item in self.items:
             if item.product.id == product.id:
                 item.quantity += quantity
@@ -27,36 +73,33 @@ class ShoppingCart:
 
         self.items.append(CartItem(product=product, quantity=quantity))
 
-    def remove_item(self, product_id: int):
-        """
-        Remove um item do carrinho pelo ID do produto.
+    def remove_item(self, product_id: int) -> None:
+        """Remove o item correspondente ao product_id do carrinho.
+
+        Não lança exceção se o produto não existir no carrinho.
 
         Args:
-            product_id (int): O ID do produto a ser removido.
+            product_id: Identificador do produto a remover.
         """
         self.items = [item for item in self.items if item.product.id != product_id]
 
-    def calculate_total(self) -> float:
-        """
-        Calcula o valor total dos itens no carrinho.
+    def calculate_total(self) -> Decimal:
+        """Calcula o valor bruto total dos itens no carrinho.
 
         Returns:
-            float: O valor total do carrinho.
+            Soma de (preço × quantidade) de todos os itens.
         """
-        return sum(item.product.price * item.quantity for item in self.items)
+        return sum(
+            (item.product.price * item.quantity for item in self.items),
+            Decimal("0"),
+        )
 
-    def calculate_total_with_discount(self) -> float:
-        """
-        Calcula o valor total com desconto aplicado.
-        - 10% de desconto para compras acima de R$ 500.
-        - 20% de desconto para compras acima de R$ 1000.
+    def calculate_total_with_discount(self) -> Decimal:
+        """Calcula o valor total após aplicação de desconto progressivo.
+
+        Delega a lógica de desconto ao DiscountCalculator injetado.
 
         Returns:
-            float: O valor total com o desconto aplicado.
+            Valor final com desconto aplicado.
         """
-        total = self.calculate_total()
-        if total > 1000:
-            return total * 0.80  # 20% de desconto
-        if total > 500:
-            return total * 0.90  # 10% de desconto
-        return total
+        return self._discount_calculator.apply(self.calculate_total())
